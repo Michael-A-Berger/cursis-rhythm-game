@@ -13,20 +13,41 @@ public class LaneScript : MonoBehaviour
     public GameObject notePrefab;
     public Text display;
     public string displayPrefix;
-    private List<Note> noteObjs;
-    private float beatsInAdvance = 2.0f;
-    private float noteSpeed = 1.0f;
-    private byte holdCounter = 0;
+    private List<NoteScript> noteObjs;
+    private byte holdCount = 0;
 	private LineRenderer hitLine;
 	private Color hitColor = Color.red;
     private Color baseColor = Color.white;
 
+    //Property Accessors
+    public byte holdCounter
+    {
+        get
+        { return holdCount; }
+    }
+    public int noteCount
+    {
+        get
+        { return noteTimes.Count; }
+    }
+    public List<float> NoteTimes
+    {
+        get
+        { return noteTimes; }
+    }
+    public List<NoteScript> NoteObjects
+    {
+        get
+        { return noteObjs; }
+    }
+
+    //Start()
 	void Start()
 	{
         display.text = displayPrefix + "N/A";
 		hitLine = this.GetComponent<LineRenderer> ();
         noteTimes = new List<float>();
-        noteObjs = new List<Note>();
+        noteObjs = new List<NoteScript>();
 	}
 
     //SetNotes()
@@ -35,71 +56,39 @@ public class LaneScript : MonoBehaviour
         noteTimes = notes;
     }
 
-	//UpdateInput()
-	public void UpdateInput(bool input, float audioTime)
-	{
-        if (input)
+    //IncrementHoldCounter()
+    public void IncrementHoldCounter()
+    {
+        holdCount++;
+    }
+
+    //ResetHoldCounter()
+    public void ResetHoldCounter()
+    {
+        holdCount = 0;
+    }
+
+    //ChangeHoldColor()
+    public void ChangeHoldColor(bool isHit)
+    {
+        if (isHit)
+            hitLine.material.color = hitColor;
+        else
+            hitLine.material.color = baseColor;
+    }
+
+    //ChangeHitText()
+    public void ChangeHitText(bool noteHit)
+    {
+        if (noteHit)
         {
-            if (holdCounter < 5)
-            {
-                hitLine.material.color = hitColor;
-                holdCounter++;
-            }
-            else
-            {
-                hitLine.material.color = baseColor;
-            }
+            display.color = Color.green;
+            display.text = displayPrefix + "Hit!";
         }
         else
         {
-            hitLine.material.color = baseColor;
-            holdCounter = 0;
+            display.color = Color.red;
+            display.text = displayPrefix + "Miss!";
         }
-
-        //Spawning New Notes
-        for (int num = 0; num < noteTimes.Count; num++)
-        {
-            float notePos = noteTimes[num];
-            
-            if (audioTime + beatsInAdvance > notePos)
-            {
-                Note newNote = Instantiate(notePrefab, startPos, Quaternion.identity).GetComponent<Note>();
-                newNote.SetProperties(notePos, noteSpeed, beatsInAdvance, startPos, lanePos, endPos);
-                noteObjs.Add(newNote);
-                noteTimes.Remove(notePos);
-                num--;
-            }
-        }
-
-        //Moving/Deleting the Note Objects
-        for (int num = 0; num < noteObjs.Count; num++)
-        {
-            bool destroyNote = false;
-            noteObjs[num].Move(audioTime);
-
-            if (noteObjs[num].lerpFactor >= 1.15f)
-            {
-                display.color = Color.red;
-                display.text = displayPrefix + "Miss!";
-                destroyNote = true;
-            }
-
-            if (holdCounter % 5 > 0   &&   Mathf.Abs(noteObjs[num].songPosition - audioTime) < 5f * (1f/60f))
-            {
-                display.color = Color.green;
-                display.text = displayPrefix + "Hit!";
-                destroyNote = true;
-            }
-
-            if (destroyNote)
-            {
-                Note copy = noteObjs[num];
-                noteObjs.Remove(copy);
-                Destroy(copy);
-                num--;
-            }
-        }
-	}
-
-
+    }
 }

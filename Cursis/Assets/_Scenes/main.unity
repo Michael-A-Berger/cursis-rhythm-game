@@ -2180,6 +2180,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   hitOctagon: {fileID: 421767422}
   inputText: {fileID: 131051862}
+  notePrefab: {fileID: 1146783567041252, guid: 0318cfe3bf876054389209eef8e3cf61, type: 2}
   debug: 0
 --- !u!4 &1792764657
 Transform:

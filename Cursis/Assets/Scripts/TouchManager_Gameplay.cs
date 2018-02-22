@@ -8,12 +8,14 @@ public class TouchManager_Gameplay : MonoBehaviour
 {
 	public GameObject hitOctagon;
     public Text inputText;
+    public GameObject notePrefab;
 	private LaneScript[] laneScripts;
     private AudioSource song;
     private float defaultNoteSpeed = 1.0f;
     private int songBPM = 75;
     private float crochet;
     private float beatsInAdvance = 2.0f;
+    private float secondsInAdvance;
     private float songStartTime = 0.0f;
 	private float measuredTime = 0.0f;
 	public bool debug;
@@ -24,8 +26,10 @@ public class TouchManager_Gameplay : MonoBehaviour
 		Application.targetFrameRate = 60;
 
         crochet = 60f / songBPM;
+        secondsInAdvance = (beatsInAdvance * crochet) / defaultNoteSpeed;
 
         song = this.GetComponent<AudioSource>();
+        song.pitch = 1f;
         laneScripts = hitOctagon.GetComponentsInChildren<LaneScript> ();
 
         createSongChart();
@@ -45,7 +49,7 @@ public class TouchManager_Gameplay : MonoBehaviour
         if (songStartTime != 0.0)
         {
             measuredTime = (float) (AudioSettings.dspTime - songStartTime) * song.pitch;
-            Debug.Log("measuredTime: " + measuredTime);
+            //Debug.Log("measuredTime: " + measuredTime);
         }
 
         //Defining the input list
@@ -110,9 +114,92 @@ public class TouchManager_Gameplay : MonoBehaviour
 	{
 		for (int num = 0; num < laneScripts.Length; num++)
 		{
-			laneScripts[num].UpdateInput(inputs[num], audioTime);
+			//laneScripts[num].UpdateInput(inputs[num], audioTime);
+            Lane_UpdateInput(laneScripts[num], inputs[num], audioTime);
 		}
 	}
+
+    private void Lane_UpdateInput(LaneScript lane, bool input, float audioTime)
+    {
+        //Handling the actual input
+        if (input)
+        {
+            if (lane.holdCounter < 5)
+            {
+                lane.ChangeHoldColor(true);
+                lane.IncrementHoldCounter();
+            }
+            else
+            {
+                lane.ChangeHoldColor(false);
+            }
+        }
+        else
+        {
+            lane.ChangeHoldColor(false);
+            lane.ResetHoldCounter();
+        }
+
+        //Spawning New Notes
+        for (int num = 0; num < lane.noteCount; num++)
+        {
+            float notePos = lane.NoteTimes[num];
+
+            if (audioTime + beatsInAdvance > notePos)
+            {
+                NoteScript newNote = Instantiate(notePrefab, lane.startPos, Quaternion.identity).GetComponent<NoteScript>();
+                newNote.SetProperties(notePos);
+                lane.NoteObjects.Add(newNote);
+                lane.NoteTimes.Remove(notePos);
+                num--;
+            }
+        }
+
+        //Moving/Deleting the Note Objects
+        for (int num = 0; num < lane.NoteObjects.Count; num++)
+        {
+            bool destroyNote = false;
+            //lane.NoteObjects[num].Move(audioTime);
+            Note_Move(lane, lane.NoteObjects[num]);
+
+            if (lane.NoteObjects[num].lerpFactor >= 1.15f)
+            {
+                lane.ChangeHitText(false);
+                destroyNote = true;
+            }
+
+            if (lane.holdCounter % 5 > 0   &&   Mathf.Abs(lane.NoteObjects[num].songPosition - audioTime) < 5f * (1f/60f))
+            {
+                lane.ChangeHitText(true);
+                destroyNote = true;
+            }
+
+            if (destroyNote)
+            {
+                NoteScript copy = lane.NoteObjects[num];
+                lane.NoteObjects.Remove(copy);
+                Destroy(copy.gameObject);
+                num--;
+            }
+        }
+    }
+
+    //Note_Move()
+    private void Note_Move(LaneScript lane, NoteScript note)
+    {
+        Vector3 newPos;
+
+        float road1Length = Mathf.Abs(Vector3.Magnitude(lane.startPos - lane.lanePos));
+        float road2Length = Mathf.Abs(Vector3.Magnitude(lane.lanePos - lane.endPos));
+        float road2Percentage = road2Length / (road1Length + road2Length);
+        note.lerpFactor = (secondsInAdvance - (note.songPosition - measuredTime)) / secondsInAdvance;
+        if (note.lerpFactor <= 1f)
+            newPos = Vector3.Lerp(lane.startPos, lane.lanePos, note.lerpFactor);
+        else
+            newPos = Vector3.Lerp(lane.lanePos, lane.endPos, (note.lerpFactor - 1f) / road2Percentage);
+        
+        note.transform.position = newPos;
+    }
 
     private void createSongChart()
     {
@@ -165,4 +252,6 @@ public class TouchManager_Gameplay : MonoBehaviour
         laneScripts[0].SetNotes(rightNotes);
         laneScripts[4].SetNotes(leftNotes);
     }
+
+
 }

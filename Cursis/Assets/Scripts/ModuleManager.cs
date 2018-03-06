@@ -9,8 +9,9 @@ using MoonSharp.Interpreter;
 
 public class ModuleManager : MonoBehaviour
 {
-    //MODULES API
-    //===========
+	//=============
+    // MODULES API
+    //=============
 
     //ModuleName -- Global string that lists the module name
     private const string api_ModuleName = "ModuleName";
@@ -21,6 +22,9 @@ public class ModuleManager : MonoBehaviour
     //ChartExtension -- Global string of the file extension used for chart files
     private const string api_ChartExtension = "ChartExtension";
 
+	//ChartFolder -- Global string of the subfolder to search for chart files within "Charts"
+	private const string api_ChartFolder = "ChartFolder";
+
     //ReadChart() -- Reads the chart into Lua memory, returns boolean
     private const string api_ReadChart = "ReadChart";
 
@@ -29,6 +33,12 @@ public class ModuleManager : MonoBehaviour
 
     //GetMetaInfo() -- Returns Lua table for the meta info (artist, charter, etc.) of the selected chart file (defaults to loaded)
     private const string api_GetMetaInfo = "GetMetaInfo";
+
+	//GetAudioFile() -- Returns a string to the audio file of the loaded chart
+	private const string api_GetAudioFile = "GetAudioFile";
+
+	//GetBackground() -- Returns a string to the image/video file to put in the background
+	private const string api_GetBackground = "GetBackground";
 
     //GetBPM() -- Returns the beats per minute (BPM) of the selected chart file (defaults to loaded)
     private const string api_GetBPM = "GetBPM";
@@ -42,26 +52,35 @@ public class ModuleManager : MonoBehaviour
     //NoteLanes() -- Returns Lua table of the lane each note travels down (denoted by number)
     private const string api_NoteLanes = "NoteLanes";
 
-    //===========
+    //============
+	// ATTRIBUTES
+	//============
 
     //MODULE DYNAMIC VALUES (ATTRIBUTES & FUNCTIONS)
     private DynValue mod_Name = null;
     private DynValue mod_Creator = null;
     private DynValue mod_ChartExtension = null;
+	private DynValue mod_ChartFolder = null;
     private DynValue mod_ReadChart = null;
     private DynValue mod_DumpChart = null;
     private DynValue mod_GetMetaInfo = null;
+	private DynValue mod_GetAudioFile = null;
+	private DynValue mod_GetBackground = null;
     private DynValue mod_GetBPM = null;
     private DynValue mod_NoteBeatTimes = null;
     private DynValue mod_NoteTypes = null;
     private DynValue mod_NoteLanes = null;
 
     //Other Attributes
+	private const string readersLocation = "Readers/";
+	private const string chartsLocation = "Charts/";
     public Text display;
     private Script module = null;
     private bool chartLoaded;
 
-    //Accessors
+	//===========
+    // ACCESSORS
+	//===========
     public bool ModuleLoaded
     {
         get
@@ -101,26 +120,34 @@ public class ModuleManager : MonoBehaviour
         }
     }
 
+	//=========
+	// METHODS
+	//=========
+
     //Start()
 	void Start ()
     {
         display.text = string.Empty;
 
         //TEST TEST TEST
-
-        //Debug.Log(System.IO.Directory.GetCurrentDirectory());
-        string[] fileToLoad = System.IO.Directory.GetFiles("Readers/", "*.lua");
-        if (fileToLoad.Length > 0)
-        {
-            LoadModule(fileToLoad[0]);
-            chartLoaded = ReadChart(string.Empty);
-            display.text = ModuleName + "\n" + ModuleCreator + "\n" + ModuleExtension;
-        }
-        else
-        {
-            display.text = "[no reader file in Assets\\Readers folder]";
-        }
-
+		if (!System.IO.Directory.Exists (readersLocation))
+		{
+			display.text = "[Readers folder doesn't exist!]";
+		}
+		else
+		{
+			string[] fileToLoad = System.IO.Directory.GetFiles (readersLocation, "*.lua");
+			if (fileToLoad.Length > 0)
+			{
+				LoadModule (fileToLoad [0]);
+				chartLoaded = ReadChart (string.Empty);
+				display.text = ModuleName + "\n" + ModuleCreator + "\n" + ModuleExtension;
+			}
+			else
+			{
+				display.text = "[no reader file in Readers folder]";
+			}
+		}
         //TEST TEST TEST
 	}
 
@@ -152,16 +179,19 @@ public class ModuleManager : MonoBehaviour
         }
 
         //Setting the module associations
-        mod_Name = module.Globals.Get(api_ModuleName);
-        mod_Creator = module.Globals.Get(api_ModuleCreator);
-        mod_ChartExtension = module.Globals.Get(api_ChartExtension);
-        mod_ReadChart = module.Globals.Get(api_ReadChart);
-        mod_DumpChart = module.Globals.Get(api_DumpChart);
-        mod_GetMetaInfo = module.Globals.Get(api_GetMetaInfo);
-        mod_GetBPM = module.Globals.Get(api_GetBPM);
-        mod_NoteBeatTimes = module.Globals.Get(api_NoteBeatTimes);
-        mod_NoteTypes = module.Globals.Get(api_NoteTypes);
-        mod_NoteLanes = module.Globals.Get(api_NoteLanes);
+        mod_Name = module.Globals.Get (api_ModuleName);
+        mod_Creator = module.Globals.Get (api_ModuleCreator);
+        mod_ChartExtension = module.Globals.Get (api_ChartExtension);
+		mod_ChartFolder = module.Globals.Get (api_ChartFolder);
+        mod_ReadChart = module.Globals.Get (api_ReadChart);
+        mod_DumpChart = module.Globals.Get (api_DumpChart);
+        mod_GetMetaInfo = module.Globals.Get (api_GetMetaInfo);
+		mod_GetAudioFile = module.Globals.Get (api_GetAudioFile);
+		mod_GetBackground = module.Globals.Get (api_GetBackground);
+        mod_GetBPM = module.Globals.Get (api_GetBPM);
+        mod_NoteBeatTimes = module.Globals.Get (api_NoteBeatTimes);
+        mod_NoteTypes = module.Globals.Get (api_NoteTypes);
+        mod_NoteLanes = module.Globals.Get (api_NoteLanes);
 
         //Returning the result
         return result;
@@ -207,6 +237,10 @@ public class ModuleManager : MonoBehaviour
         if (checkChartRead && !chartLoaded)
             throw new Exception("CHART NOT LOADED");
     }
+
+	//=========================
+	// EXAMPLE MOON-SHARP CODE
+	//=========================
 
     //Mul()
     int Mul(int a, int b)

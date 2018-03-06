@@ -32,3 +32,7 @@ sysinfo.txt
 # Builds
 *.apk
 *.unitypackage
+
+# Charts Folder
+Cursis/Charts/**
+!Cursis/Charts/READ_ME.txt

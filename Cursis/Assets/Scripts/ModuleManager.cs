@@ -5,7 +5,9 @@ using System.IO;
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Networking;
 using MoonSharp.Interpreter;
+using MoonSharp.Interpreter.Platforms;
 
 public class ModuleManager : MonoBehaviour
 {
@@ -25,13 +27,13 @@ public class ModuleManager : MonoBehaviour
 	//ChartFolder -- Global string of the subfolder to search for chart files within "Charts"
 	private const string api_ChartFolder = "ChartFolder";
 
-    //ReadChart() -- Reads the chart into Lua memory, returns boolean
-    private const string api_ReadChart = "ReadChart";
+    //ReadChartFile() -- Reads the chart into Lua memory, returns boolean
+    private const string api_ReadChartFile = "ReadChartFile";
 
-    //DumpChart() -- "Dumps" the chart that was read into Lua memory, returns boolean
-    private const string api_DumpChart = "DumpChart";
+    //DumpChartFile() -- "Dumps" the chart that was read into Lua memory, returns boolean
+    private const string api_DumpChartFile = "DumpChartFile";
 
-    //GetMetaInfo() -- Returns Lua table for the meta info (artist, charter, etc.) of the selected chart file (defaults to loaded)
+    //GetMetaInfo() -- Returns Lua table for the meta info (artist, charter, etc.) of the selected chart file
     private const string api_GetMetaInfo = "GetMetaInfo";
 
 	//GetAudioFile() -- Returns a string to the audio file of the loaded chart
@@ -40,17 +42,26 @@ public class ModuleManager : MonoBehaviour
 	//GetBackground() -- Returns a string to the image/video file to put in the background
 	private const string api_GetBackground = "GetBackground";
 
-    //GetBPM() -- Returns the beats per minute (BPM) of the selected chart file (defaults to loaded)
-    private const string api_GetBPM = "GetBPM";
+    //GetBPMs() -- Returns a table of the beats per minute (BPM) profiles of the selected chart file (defaults to loaded)
+    private const string api_GetBPMs = "GetBPMs";
 
-    //NoteBeatTimes() -- Returns Lua table of the timing of each note in beats
-    private const string api_NoteBeatTimes = "NoteBeatTimes";
+	//GetChartDifficulties() -- Returns Lua string table of the difficulties in the chart file
+	private const string api_GetChartDifficulties = "GetChartDifficulties";
+
+	//GetChartOffset() -- Returns Lua number for how many bars to skip before overlaying the note pattern
+	private const string api_GetChartOffset = "GetChartOffset";
+
+	//ReadChart() -- Reads a chart from the selected
+	private const string api_ReadChart = "ReadChart";
+
+    //NoteBeatTimes() -- Returns Lua number table of the timing of each note in beats
+    private const string api_NoteBeatTimes = "GetNoteBeatTimes";
 
     //NoteTypes() -- Returns Lua table of the type of each note (denoted by number)
-    private const string api_NoteTypes = "NoteTypes";
+    private const string api_NoteTypes = "GetNoteTypes";
 
     //NoteLanes() -- Returns Lua table of the lane each note travels down (denoted by number)
-    private const string api_NoteLanes = "NoteLanes";
+    private const string api_NoteLanes = "GetNoteLanes";
 
     //============
 	// ATTRIBUTES
@@ -61,19 +72,22 @@ public class ModuleManager : MonoBehaviour
     private DynValue mod_Creator = null;
     private DynValue mod_ChartExtension = null;
 	private DynValue mod_ChartFolder = null;
-    private DynValue mod_ReadChart = null;
-    private DynValue mod_DumpChart = null;
+    private DynValue mod_ReadChartFile = null;
+    private DynValue mod_DumpChartFile = null;
     private DynValue mod_GetMetaInfo = null;
 	private DynValue mod_GetAudioFile = null;
 	private DynValue mod_GetBackground = null;
-    private DynValue mod_GetBPM = null;
+    private DynValue mod_GetBPMs = null;
+	private DynValue mod_GetChartDifficulties = null;
+	private DynValue mod_GetChartOffset = null;
+	private DynValue mod_ReadChart = null;
     private DynValue mod_NoteBeatTimes = null;
     private DynValue mod_NoteTypes = null;
     private DynValue mod_NoteLanes = null;
 
     //Other Attributes
-	private const string readersLocation = "Readers/";
-	private const string chartsLocation = "Charts/";
+	private const string readersLocation = "Readers\\";
+	private const string chartsLocation = "Charts\\";
     public Text display;
     private Script module = null;
     private bool chartLoaded;
@@ -119,6 +133,17 @@ public class ModuleManager : MonoBehaviour
                 return "[chart extension is not a string]";
         }
     }
+	public string ModuleFolder
+	{
+		get
+		{
+			AbortCheck(false);
+			if (mod_ChartFolder.Type == DataType.String)
+				return mod_ChartFolder.String;
+			else
+				return "[chart folder is not a string]";
+		}
+	}
 
 	//=========
 	// METHODS
@@ -127,9 +152,17 @@ public class ModuleManager : MonoBehaviour
     //Start()
 	void Start ()
     {
+		Script.DefaultOptions.DebugPrint = s => Debug.Log ("~LUA~\t" + s);
+		if (Script.GlobalOptions.Platform.GetType() == typeof(LimitedPlatformAccessor))
+		{
+			Script.GlobalOptions.Platform = new StandardPlatformAccessor ();
+			Debug.Log ("Changed from Limited to Standard Platform Accessor");
+		}
+
         display.text = string.Empty;
 
         //TEST TEST TEST
+		/*
 		if (!System.IO.Directory.Exists (readersLocation))
 		{
 			display.text = "[Readers folder doesn't exist!]";
@@ -140,14 +173,17 @@ public class ModuleManager : MonoBehaviour
 			if (fileToLoad.Length > 0)
 			{
 				LoadModule (fileToLoad [0]);
-				chartLoaded = ReadChart (string.Empty);
 				display.text = ModuleName + "\n" + ModuleCreator + "\n" + ModuleExtension;
+				string chartToRead = Directory.GetCurrentDirectory () + "\\";
+				chartToRead += chartsLocation + ModuleFolder + "\\DDR Supernova 2 (AC)\\Bloody Tears (IIDX EDITION)\\Bloody Tears (IIDX EDITION).sm";
+				chartLoaded = ReadChartFile(chartToRead);
 			}
 			else
 			{
 				display.text = "[no reader file in Readers folder]";
 			}
 		}
+		*/
         //TEST TEST TEST
 	}
 
@@ -161,14 +197,13 @@ public class ModuleManager : MonoBehaviour
             UnloadModule();
 
         //Read Lua script from disk
-        module = new Script();
+		module = new Script(CoreModules.Preset_Default);
         FileStream reader = new FileStream(moduleFile, FileMode.Open);
         using (reader)
         {
             try
             {
                 module.DoStream(reader);
-                //Debug.Log(module.GetSourceCode(0).Code);
                 reader.Close();
                 result = true;
             }
@@ -183,12 +218,15 @@ public class ModuleManager : MonoBehaviour
         mod_Creator = module.Globals.Get (api_ModuleCreator);
         mod_ChartExtension = module.Globals.Get (api_ChartExtension);
 		mod_ChartFolder = module.Globals.Get (api_ChartFolder);
-        mod_ReadChart = module.Globals.Get (api_ReadChart);
-        mod_DumpChart = module.Globals.Get (api_DumpChart);
+        mod_ReadChartFile = module.Globals.Get (api_ReadChartFile);
+        mod_DumpChartFile = module.Globals.Get (api_DumpChartFile);
         mod_GetMetaInfo = module.Globals.Get (api_GetMetaInfo);
 		mod_GetAudioFile = module.Globals.Get (api_GetAudioFile);
 		mod_GetBackground = module.Globals.Get (api_GetBackground);
-        mod_GetBPM = module.Globals.Get (api_GetBPM);
+        mod_GetBPMs = module.Globals.Get (api_GetBPMs);
+		mod_GetChartDifficulties = module.Globals.Get (api_GetChartDifficulties);
+		mod_GetChartOffset = module.Globals.Get (api_GetChartOffset);
+		mod_ReadChart = module.Globals.Get (api_ReadChart);
         mod_NoteBeatTimes = module.Globals.Get (api_NoteBeatTimes);
         mod_NoteTypes = module.Globals.Get (api_NoteTypes);
         mod_NoteLanes = module.Globals.Get (api_NoteLanes);
@@ -204,7 +242,7 @@ public class ModuleManager : MonoBehaviour
 
         bool result = false;
 
-        result = module.Call(mod_DumpChart).Boolean;
+        result = module.Call(mod_DumpChartFile).Boolean;
 
         if (result)
         {
@@ -214,19 +252,85 @@ public class ModuleManager : MonoBehaviour
         return result;
     }
 
-    //ReadChart()
-    public bool ReadChart(string chartLocation)
-    {
-        AbortCheck(false);
+	//ReadChartFile()
+	public bool ReadChartFile(string chartLocation)
+	{
+		AbortCheck(false);
 
-        //Reading the chart
-        if (module.Call(mod_DumpChart).Boolean)
-        {
-            chartLoaded = module.Call(mod_ReadChart, DynValue.NewString(chartLocation)).Boolean;
-        }
+		//Reading the chart
+		if (module.Call(mod_DumpChartFile).Boolean)
+		{
+			chartLoaded = module.Call(mod_ReadChartFile, DynValue.NewString(chartLocation)).Boolean;
+		}
 
-        return chartLoaded;
-    }
+		return chartLoaded;
+	}
+
+	//GetChartMetaInfo()
+	public Dictionary<string, string> GetChartMetaInfo()
+	{
+		AbortCheck (true);
+		
+		Dictionary<string, string> metaInfo = new Dictionary<string, string>();
+
+		Table metaTable = module.Call (mod_GetMetaInfo).Table;
+
+		List<DynValue> metaKeys = new List<DynValue>(metaTable.Keys);
+		List<DynValue> metaValues = new List<DynValue>(metaTable.Values);
+
+		for (int num = 0; num < metaKeys.Count; num++)
+			metaInfo.Add (metaKeys[num].String.ToLower(), metaValues[num].String);
+		
+		return metaInfo;
+	}
+
+	//GetChartDifficulties
+	public string[] GetChartDifficulties()
+	{
+		AbortCheck (false);
+
+		List<DynValue> diffTable = new List<DynValue>(module.Call (mod_GetChartDifficulties).Table.Values);
+		string[] chartDifficulties = new string[diffTable.Count];
+		for (int num = 0; num < diffTable.Count; num++)
+		{
+			chartDifficulties [num] = diffTable [num].String;
+		}
+			
+		return chartDifficulties;
+	}
+
+	public bool ReadChartData(string difficulty)
+	{
+		AbortCheck (false);
+
+		bool result = false;
+
+		if (module.Call (mod_ReadChart, DynValue.NewString (difficulty)).Boolean)
+		{
+			result = true;
+		}
+
+		return result;
+	}
+
+	//GetChartCount()
+	public ulong GetChartCount()
+	{
+		AbortCheck (false);
+		
+		ulong result = 0;
+
+		try
+		{
+			string[] chartFiles = Directory.GetFiles(chartsLocation + ModuleFolder, "*" + ModuleExtension);
+		}
+		catch (Exception e)
+		{
+			throw e;
+		}
+
+		return result;
+	}
 
     //EarlyAbort()
     private void AbortCheck(bool checkChartRead)
@@ -236,70 +340,5 @@ public class ModuleManager : MonoBehaviour
 
         if (checkChartRead && !chartLoaded)
             throw new Exception("CHART NOT LOADED");
-    }
-
-	//=========================
-	// EXAMPLE MOON-SHARP CODE
-	//=========================
-
-    //Mul()
-    int Mul(int a, int b)
-    {
-        return a * b;
-    }
-
-    //MoonSharpFactorial()
-    double MoonSharpFactorial(int number)
-    {
-        string scriptCode = @"
-        -- defines a factorial function
-        function fact(n)
-            if (n == 0) then
-                return 1
-            else
-                return Mul(n, fact(n - 1));
-            end
-        end";
-        
-        Script script = new Script();
-
-        script.Globals["Mul"] = (Func<int, int, int>) Mul;
-
-        script.DoString(scriptCode);
-
-        DynValue luaFunction = script.Globals.Get("fact");
-
-        DynValue res = script.Call(luaFunction, DynValue.NewNumber(4));
-
-        return res.Number;
-    }
-
-    //GetListFromLuaTable()
-    List<double> GetListFromLuaTable()
-    {
-        List<double> result = new List<double>();
-
-        string scriptCode = @"
-        -- returns a table from LUA
-        function notes()
-            tb = {};
-            tb[0] = 5.5;
-            tb[1] = 6.5;
-            tb[2] = 7.5;
-            tb[3] = 8.5;
-            return tb;
-        end";
-
-        Script script = new Script();
-        script.DoString(scriptCode);
-        DynValue luaFunction = script.Globals.Get("notes");
-        Table tb = script.Call(luaFunction).Table;
-
-        foreach (DynValue val in tb.Values)
-        {
-            result.Add(val.Number);
-        }
-
-        return result;
     }
 }

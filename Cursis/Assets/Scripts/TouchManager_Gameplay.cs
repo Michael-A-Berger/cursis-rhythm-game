@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System.IO;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -9,7 +10,9 @@ public class TouchManager_Gameplay : MonoBehaviour
 	public GameObject hitOctagon;
     public Text inputText;
     public GameObject notePrefab;
+	public GameObject modManager;
 	private LaneScript[] laneScripts;
+	private ModuleManager modScript;
     private AudioSource song;
     private float defaultNoteSpeed = 1.0f;
     private int songBPM = 75;
@@ -18,35 +21,55 @@ public class TouchManager_Gameplay : MonoBehaviour
     private float secondsInAdvance;
     private float songStartTime = 0.0f;
 	private float measuredTime = 0.0f;
+	private string testReader = "Readers\\real_reader.lua";
+	private string testChart = string.Empty;
 	public bool debug;
 
 	void Start()
 	{
+		//Taking care of the framerate
 		QualitySettings.vSyncCount = 0;
 		Application.targetFrameRate = 60;
 
+		//Managing the module + loading the chart
+		modScript = modManager.GetComponent<ModuleManager> ();
+		testChart = Directory.GetCurrentDirectory () + "\\Charts\\Stepmania Simfiles\\";
+		testChart += "DDR Supernova 2 (AC)\\Bloody Tears (IIDX EDITION)\\Bloody Tears (IIDX EDITION).sm";
+
+		//Taking care of the song properties & variables
         crochet = 60f / songBPM;
         secondsInAdvance = (beatsInAdvance * crochet) / defaultNoteSpeed;
 
         song = this.GetComponent<AudioSource>();
         song.pitch = 1f;
         laneScripts = hitOctagon.GetComponentsInChildren<LaneScript> ();
-
-        createSongChart();
 	}
 
     //FixedUpdate()
 	void FixedUpdate()
 	{
         //Starting the song
-        if (songStartTime == 0.0 && Time.realtimeSinceStartup > 3)
+        if (songStartTime == 0.0 && Time.realtimeSinceStartup > 1.5f)
         {
+			/*
             song.Play();
             songStartTime = (float) AudioSettings.dspTime;
+            */
+			if (modScript.LoadModule (testReader) && modScript.ReadChartFile(testChart))
+			{
+				string[] difficulties = modScript.GetChartDifficulties ();
+				Debug.Log (difficulties[3]);
+				if(modScript.ReadChartData(difficulties[3]))
+				{
+					Debug.Log ("Chart data read!");
+				}
+			}
+
+			songStartTime = -1f;
         }
 
         //Updating the measured song time
-        if (songStartTime != 0.0)
+        if (songStartTime > 0.0)
         {
             measuredTime = (float) (AudioSettings.dspTime - songStartTime) * song.pitch;
             //Debug.Log("measuredTime: " + measuredTime);
@@ -204,50 +227,16 @@ public class TouchManager_Gameplay : MonoBehaviour
     private void createSongChart()
     {
         List<float> rightNotes = new List<float>();
-        rightNotes.Add(crochet * 5f);
-        rightNotes.Add(crochet * 6f);
-        rightNotes.Add(crochet * 7f);
-        rightNotes.Add(crochet * 8f);
-        rightNotes.Add(crochet * 9f);
-        rightNotes.Add(crochet * 10f);
-        rightNotes.Add(crochet * 11f);
-        rightNotes.Add(crochet * 12f);
-        rightNotes.Add(crochet * 13f);
-        rightNotes.Add(crochet * 14f);
-        rightNotes.Add(crochet * 15f);
-        rightNotes.Add(crochet * 16f);
-        rightNotes.Add(crochet * 17f);
-        rightNotes.Add(crochet * 18f);
-        rightNotes.Add(crochet * 19f);
-        rightNotes.Add(crochet * 20f);
-        rightNotes.Add(crochet * 21f);
-        rightNotes.Add(crochet * 22f);
-        rightNotes.Add(crochet * 23f);
-        rightNotes.Add(crochet * 24f);
-        rightNotes.Add(crochet * 25f);
+		for (int num = 0; num < 75; num++)
+		{
+			rightNotes.Add (crochet * (5f + num));
+		}
 
         List<float> leftNotes = new List<float>();
-        leftNotes.Add(crochet * 5.5f);
-        leftNotes.Add(crochet * 6.5f);
-        leftNotes.Add(crochet * 7.5f);
-        leftNotes.Add(crochet * 8.5f);
-        leftNotes.Add(crochet * 9.5f);
-        leftNotes.Add(crochet * 10.5f);
-        leftNotes.Add(crochet * 11.5f);
-        leftNotes.Add(crochet * 12.5f);
-        leftNotes.Add(crochet * 13.5f);
-        leftNotes.Add(crochet * 14.5f);
-        leftNotes.Add(crochet * 15.5f);
-        leftNotes.Add(crochet * 16.5f);
-        leftNotes.Add(crochet * 17.5f);
-        leftNotes.Add(crochet * 18.5f);
-        leftNotes.Add(crochet * 19.5f);
-        leftNotes.Add(crochet * 20.5f);
-        leftNotes.Add(crochet * 21.5f);
-        leftNotes.Add(crochet * 22.5f);
-        leftNotes.Add(crochet * 23.5f);
-        leftNotes.Add(crochet * 24.5f);
-        leftNotes.Add(crochet * 25.5f);
+		for (int num = 0; num < 75; num++)
+		{
+			leftNotes.Add (crochet * (5.5f + num));
+		}
 
         laneScripts[0].SetNotes(rightNotes);
         laneScripts[4].SetNotes(leftNotes);

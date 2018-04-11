@@ -143,11 +143,8 @@ end
 
 -- ReadChart()
 function ReadChart(chartToRead)
-	chart_BeatTimes = {};
-	chart_NoteTypes = {};
-	chart_NoteLanes = {};
-
 	result = readChartFromDifficulty(chartToRead);
+	readHeaderSection();
 	return result;
 end
 
@@ -259,29 +256,38 @@ function readChartFromDifficulty(difficulty)
 	local allChartDifficulties = chartFile:gmatch("#NOTES:.-\n,\n");
 
 	-- Getting the appropriate chart
-	print("-- Test #1");
+	local diffCount = 0;
+	local diffLine = nil;
 	for diff in allChartDifficulties do
-		currentChart = diff:match(chartType .. ":.*:.*:.*" .. diffNumber .. ":.*:");
+		-- Checking the appropriate chart type
+		diffCount = diff:find("\n", 1);
+		diffLine = diff:sub(diffCount + 1, diff:find("\n", diffCount + 1) - 1);
 
-		if (currentChart ~= nil) then
-			break;
+		if (diffLine:find(chartType) ~= nil) then
+			for i=1,3 do
+				diffCount = diff:find("\n", diffCount + 1);
+			end
+			diffLine = diff:sub(diffCount + 1, diff:find("\n", diffCount + 1) - 1);
+
+			if (diffLine:find(diffNumber) ~= nil) then
+				currentChart = diff;
+				break;
+			end
 		end
 	end
 
 	chartLoc = chartFile:find(currentChart, 1, true);
 	currentChart = chartFile:sub(chartLoc);
-	print("-- Test #2");
-	local chartFluff = currentChart:sub(currentChart:find(".*:.*:.*:.*:.*:"), currentChart:find("%d*\n%d*\n") - 1);
-	currentChart = currentChart:sub(chartFluff:len() + 2, currentChart:find(";"));
+	currentChart = currentChart:sub(0, currentChart:find(";") - 2);
 
 	-- Splicing the chart along the commas
-	print("-- Test #3");
-	local chartMeasures = currentChart:gmatch("(.-)\n[,;]");
+	local chartMeasures = currentChart:gmatch(".-\n,");
 
 	-- Processing each measure
 	local beatTime = 0;
 	for measure in chartMeasures do
-		local beatLineFunc = measure:gsub("\n", " "):gmatch("%S+");
+		measure = measure:sub(0, measure:len() - 2):gsub("\n", " ");
+		local beatLineFunc = measure:gmatch("%S+");
 		local beatStrings = {};
 		local beatStringsNumber = 0;
 		for ln in beatLineFunc do
@@ -395,48 +401,42 @@ end
 
 -- printChartInfo()
 function printChartInfo()
-	for i=1,table.getn(chart_BeatTimes) do
+	for i=1,#chart_BeatTimes do
 		print("#" .. i .. ":", chart_NoteTypes[i], chart_NoteLanes[i], chart_BeatTimes[i]);
 	end
 end
 
-
 -- TEST TEST TEST TEST TEST
-chartToRead = "../Charts/" .. ChartFolder .. "/DDR Supernova 2 (AC)/Bloody Tears (IIDX EDITION)/Bloody Tears (IIDX EDITION).sm";
---chartToRead = "../Charts/" .. ChartFolder .. "/O2Jam MIX/Cross Time/Cross Time.sm";
-chartDiff = "Single 10";
-print(chartToRead .. "\n" .. chartDiff, "\n");
-ReadChartFile(chartToRead);
+--[===[
+testFile = "../Charts/Stepmania Simfiles/DDR Supernova 2 (AC)/Bloody Tears (IIDX EDITION)/Bloody Tears (IIDX EDITION).sm";
+--testFile = "../Charts/Stepmania Simfiles/O2Jam Mix/Cross Time/Cross Time.sm";
 
---readHeaderSection();
+ReadChartFile(testFile);
 
-readChartFromDifficulty(chartDiff);
+readChartFromDifficulty("Single 10");
+
+readHeaderSection();
+
+--print(GetAudioFile());
+
+--[==[
+testBPMs = GetBPMs();
+for key,value in pairs(testBPMs) do
+	print(key, value);
+end
+--]==]
 
 printChartInfo();
 
---print(GetBackground());
---print(GetAudioFile());
---print(GetChartOffset());
 
---testDifficulties = GetChartDifficulties();
---for key,value in pairs(testDifficulties) do
-	--print(key .. ":\t" .. value);
---end
-
---testMeta = GetMetaInfo();
---for key,value in pairs(testMeta) do
-	--print(key .. ":   " .. value);
---end
-
---testBPMs = GetBPMs();
---for key,value in pairs(testBPMs) do
-	--print(key .. ":   " .. value);
---end
-
-
--- TEST TEST TEST TEST TEST
---[===[
 --]===]
+-- TEST TEST TEST TEST TEST
+
+
+
+
+
+
 
 
 

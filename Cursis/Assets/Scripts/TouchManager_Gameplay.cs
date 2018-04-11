@@ -1,9 +1,11 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using UnityEngine.Networking;
 
 public class TouchManager_Gameplay : MonoBehaviour
 {
@@ -15,7 +17,7 @@ public class TouchManager_Gameplay : MonoBehaviour
 	private ModuleManager modScript;
     private AudioSource song;
     private float defaultNoteSpeed = 1.0f;
-    private int songBPM = 75;
+    private int songBPM = 80;
     private float crochet;
     private float beatsInAdvance = 2.0f;
     private float secondsInAdvance;
@@ -23,7 +25,11 @@ public class TouchManager_Gameplay : MonoBehaviour
 	private float measuredTime = 0.0f;
 	private string testReader = "Readers\\real_reader.lua";
 	private string testChart = string.Empty;
+	private string chartsLocation = string.Empty;
+	private UnityWebRequest webAudio;
 	public bool debug;
+	private bool canLoadSong = true;
+	private float loadSongTime = float.MaxValue * 0.8f;
 
 	void Start()
 	{
@@ -33,8 +39,10 @@ public class TouchManager_Gameplay : MonoBehaviour
 
 		//Managing the module + loading the chart
 		modScript = modManager.GetComponent<ModuleManager> ();
+		chartsLocation = Directory.GetCurrentDirectory () + "\\Charts\\";
 		testChart = Directory.GetCurrentDirectory () + "\\Charts\\Stepmania Simfiles\\";
-		testChart += "DDR Supernova 2 (AC)\\Bloody Tears (IIDX EDITION)\\Bloody Tears (IIDX EDITION).sm";
+		//testChart += "DDR Supernova 2 (AC)\\Bloody Tears (IIDX EDITION)\\Bloody Tears (IIDX EDITION).sm";
+		testChart += "O2Jam MIX\\Cross Time\\Cross Time.sm";
 
 		//Taking care of the song properties & variables
         crochet = 60f / songBPM;
@@ -48,25 +56,81 @@ public class TouchManager_Gameplay : MonoBehaviour
     //FixedUpdate()
 	void FixedUpdate()
 	{
+		//
+		if (!modScript.ModuleLoaded)
+		{
+			modScript.LoadModule (testReader);
+			chartsLocation += modScript.ModuleFolder + "\\";
+		}
+
         //Starting the song
-        if (songStartTime == 0.0 && Time.realtimeSinceStartup > 1.5f)
+		if (canLoadSong && Input.GetKeyDown(KeyCode.P))
         {
-			/*
-            song.Play();
-            songStartTime = (float) AudioSettings.dspTime;
-            */
-			if (modScript.LoadModule (testReader) && modScript.ReadChartFile(testChart))
+			canLoadSong = false;
+			if (modScript.ReadChartFile(testChart))
 			{
 				string[] difficulties = modScript.GetChartDifficulties ();
-				Debug.Log (difficulties[3]);
-				if(modScript.ReadChartData(difficulties[3]))
+				if(modScript.ReadChartData(difficulties[1]))
 				{
-					Debug.Log ("Chart data read!");
+					//Getting the audio file
+					string audioLoc = modScript.GetAudioFile();
+					string toReplace = testChart.Substring (testChart.LastIndexOf("\\") + 1);
+					audioLoc = testChart.Replace (toReplace, audioLoc);
+
+					string audioExtension = audioLoc.Substring (audioLoc.LastIndexOf(".") + 1);
+					AudioType ext;
+
+					switch (audioExtension)
+					{
+					case "mp3":
+						ext = AudioType.MPEG;
+						break;
+					case "mp2":
+						ext = AudioType.MPEG;
+						break;
+					case "ogg":
+						ext = AudioType.OGGVORBIS;
+						break;
+					case "wav":
+						ext = AudioType.WAV;
+						break;
+					default:
+						throw new Exception ("AUDIO TYPE NOT SUPPORTED");
+					}
+
+					try
+					{
+						webAudio = UnityWebRequestMultimedia.GetAudioClip("file:///" + audioLoc, ext);
+						webAudio.SendWebRequest();
+					}
+					catch (Exception e)
+					{
+						throw e;
+					}
+
+					List<float>[] chartNotes = modScript.CalculateNotes ();
+					for (int num = 0; num < chartNotes.Length; num++)
+					{
+						laneScripts [num].SetNotes (chartNotes [num]);
+					}
+
+					loadSongTime = Time.realtimeSinceStartup;
 				}
 			}
-
-			songStartTime = -1f;
         }
+
+		//
+		if (Time.realtimeSinceStartup > (4f + loadSongTime) && songStartTime == 0.0f)
+		{
+			//Changing the song audio
+			song.clip = DownloadHandlerAudioClip.GetContent(webAudio);
+
+			//Playing the song
+			song.Play();
+
+			//
+			songStartTime = (float) AudioSettings.dspTime;
+		}
 
         //Updating the measured song time
         if (songStartTime > 0.0)
@@ -182,18 +246,18 @@ public class TouchManager_Gameplay : MonoBehaviour
         for (int num = 0; num < lane.NoteObjects.Count; num++)
         {
             bool destroyNote = false;
-            //lane.NoteObjects[num].Move(audioTime);
             Note_Move(lane, lane.NoteObjects[num]);
+			float msDiff = lane.NoteObjects [num].songPosition - audioTime;
 
             if (lane.NoteObjects[num].lerpFactor >= 1.15f)
             {
-                lane.ChangeHitText(false);
+                lane.ChangeHitText(false, 0f);
                 destroyNote = true;
             }
 
-            if (lane.holdCounter % 5 > 0   &&   Mathf.Abs(lane.NoteObjects[num].songPosition - audioTime) < 5f * (1f/60f))
+			if (lane.holdCounter % 5 > 0   &&   Mathf.Abs(msDiff) < 5f * (1f/60f))
             {
-                lane.ChangeHitText(true);
+				lane.ChangeHitText(true, msDiff * 1000f);
                 destroyNote = true;
             }
 

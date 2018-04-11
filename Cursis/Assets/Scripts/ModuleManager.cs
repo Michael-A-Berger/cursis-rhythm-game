@@ -145,9 +145,9 @@ public class ModuleManager : MonoBehaviour
 		}
 	}
 
-	//=========
-	// METHODS
-	//=========
+	//=================
+	// MANAGER METHODS
+	//=================
 
     //Start()
 	void Start ()
@@ -160,110 +160,203 @@ public class ModuleManager : MonoBehaviour
 		}
 
         display.text = string.Empty;
-
-        //TEST TEST TEST
-		/*
-		if (!System.IO.Directory.Exists (readersLocation))
-		{
-			display.text = "[Readers folder doesn't exist!]";
-		}
-		else
-		{
-			string[] fileToLoad = System.IO.Directory.GetFiles (readersLocation, "*.lua");
-			if (fileToLoad.Length > 0)
-			{
-				LoadModule (fileToLoad [0]);
-				display.text = ModuleName + "\n" + ModuleCreator + "\n" + ModuleExtension;
-				string chartToRead = Directory.GetCurrentDirectory () + "\\";
-				chartToRead += chartsLocation + ModuleFolder + "\\DDR Supernova 2 (AC)\\Bloody Tears (IIDX EDITION)\\Bloody Tears (IIDX EDITION).sm";
-				chartLoaded = ReadChartFile(chartToRead);
-			}
-			else
-			{
-				display.text = "[no reader file in Readers folder]";
-			}
-		}
-		*/
-        //TEST TEST TEST
 	}
 
-    //LoadModule()
-    public bool LoadModule(string moduleFile)
-    {
-        bool result = false;
+	//GetChartCount()
+	public int GetChartCount()
+	{
+		AbortCheck (false);
 
-        //Checking if another module is loaded
-        if (ModuleLoaded)
-            UnloadModule();
+		int result = 0;
 
-        //Read Lua script from disk
+		try
+		{
+			string[] chartFiles = Directory.GetFiles(Directory.GetCurrentDirectory() + "\\Charts\\" + ModuleFolder + "\\", "*" + ModuleExtension, SearchOption.AllDirectories);
+			result = chartFiles.Length;
+		}
+		catch (Exception e)
+		{
+			throw e;
+		}
+
+		return result;
+	}
+
+	//GetAllCharts9)
+	public string[] GetAllCharts()
+	{
+		string[] chartFiles;
+
+		try
+		{
+			chartFiles = Directory.GetFiles(Directory.GetCurrentDirectory() + "\\Charts\\" + ModuleFolder + "\\", "*" + ModuleExtension, SearchOption.AllDirectories);
+		}
+		catch (Exception e)
+		{
+			throw e;
+		}
+		
+		return chartFiles;
+	}
+
+	//EarlyAbort()
+	private void AbortCheck(bool checkChartRead)
+	{
+		if (!ModuleLoaded)
+			throw new Exception("MODULE NOT LOADED");
+
+		if (checkChartRead && !chartLoaded)
+			throw new Exception("CHART NOT LOADED");
+	}
+
+	//LoadModule()
+	public bool LoadModule(string moduleFile)
+	{
+		bool result = false;
+
+		//Checking if another module is loaded
+		if (ModuleLoaded)
+			UnloadModule();
+
+		//Read Lua script from disk
 		module = new Script(CoreModules.Preset_Default);
-        FileStream reader = new FileStream(moduleFile, FileMode.Open);
-        using (reader)
-        {
-            try
-            {
-                module.DoStream(reader);
-                reader.Close();
-                result = true;
-            }
-            catch (Exception e)
-            {
-                throw e;
-            }
-        }
+		FileStream reader = new FileStream(moduleFile, FileMode.Open);
+		using (reader)
+		{
+			try
+			{
+				module.DoStream(reader);
+				reader.Close();
+				result = true;
+			}
+			catch (Exception e)
+			{
+				throw e;
+			}
+		}
 
-        //Setting the module associations
-        mod_Name = module.Globals.Get (api_ModuleName);
-        mod_Creator = module.Globals.Get (api_ModuleCreator);
-        mod_ChartExtension = module.Globals.Get (api_ChartExtension);
+		//Setting the module associations
+		mod_Name = module.Globals.Get (api_ModuleName);
+		mod_Creator = module.Globals.Get (api_ModuleCreator);
+		mod_ChartExtension = module.Globals.Get (api_ChartExtension);
 		mod_ChartFolder = module.Globals.Get (api_ChartFolder);
-        mod_ReadChartFile = module.Globals.Get (api_ReadChartFile);
-        mod_DumpChartFile = module.Globals.Get (api_DumpChartFile);
-        mod_GetMetaInfo = module.Globals.Get (api_GetMetaInfo);
+		mod_ReadChartFile = module.Globals.Get (api_ReadChartFile);
+		mod_DumpChartFile = module.Globals.Get (api_DumpChartFile);
+		mod_GetMetaInfo = module.Globals.Get (api_GetMetaInfo);
 		mod_GetAudioFile = module.Globals.Get (api_GetAudioFile);
 		mod_GetBackground = module.Globals.Get (api_GetBackground);
-        mod_GetBPMs = module.Globals.Get (api_GetBPMs);
+		mod_GetBPMs = module.Globals.Get (api_GetBPMs);
 		mod_GetChartDifficulties = module.Globals.Get (api_GetChartDifficulties);
 		mod_GetChartOffset = module.Globals.Get (api_GetChartOffset);
 		mod_ReadChart = module.Globals.Get (api_ReadChart);
-        mod_NoteBeatTimes = module.Globals.Get (api_NoteBeatTimes);
-        mod_NoteTypes = module.Globals.Get (api_NoteTypes);
-        mod_NoteLanes = module.Globals.Get (api_NoteLanes);
+		mod_NoteBeatTimes = module.Globals.Get (api_NoteBeatTimes);
+		mod_NoteTypes = module.Globals.Get (api_NoteTypes);
+		mod_NoteLanes = module.Globals.Get (api_NoteLanes);
 
-        //Returning the result
-        return result;
-    }
+		//Returning the result
+		return result;
+	}
 
-    //UnloadModule()
-    public bool UnloadModule()
-    {
-        AbortCheck(false);
+	//UnloadModule()
+	public bool UnloadModule()
+	{
+		bool result = true;
 
-        bool result = false;
+		if (ModuleLoaded)
+		{
+			result = module.Call(mod_DumpChartFile).Boolean;
 
-        result = module.Call(mod_DumpChartFile).Boolean;
+			if (result)
+			{
+				module = null;
+			}
+			else
+			{
+				throw new Exception ("ERROR: LUA UNABLE TO DUMP CHART");
+			}
+		}
 
-        if (result)
-        {
-            module = null;
-        }
+		return result;
+	}
 
-        return result;
-    }
+	public List<float>[] CalculateNotes()
+	{
+		AbortCheck (true);
+		
+		//Creating the array of float lists
+		List<float>[] notes = new List<float>[8];
+		for (int num = 0; num < 8; num++)
+			notes[num] = new List<float>();
+
+		//Getting the note data
+		double[] note_BeatTimes = GetBeatTimes();
+		double[] note_Lanes = GetNoteLanes ();
+		double[] note_Types = GetNoteTypes ();
+
+		//Getting the BPMs
+		Vector2[] bpms = GetBPMs();			//X = Beat of BPM Change, Y = BPM value
+
+		//Creating the current time, current beat, and BPM holding variables
+		float passedTime = 0f;
+		float passedBeats = 0f;
+		float currentBPM = bpms [0].y;
+		int bpmsCounter = 0;
+		float crotchet = 60f / currentBPM;
+
+		//Iterating through every note
+		for (int num = 0; num < note_BeatTimes.Length; num++)
+		{
+			//Updating the BPMs counter + passed beats/time
+			if (bpmsCounter < bpms.Length - 1 && note_BeatTimes[num] > bpms[bpmsCounter + 1].x)
+			{
+				//Calculating the passed beats
+				float beatsToMultiplyBy = bpms [bpmsCounter + 1].x - bpms [bpmsCounter].x;
+
+				//Incrementing the passed beats and time
+				passedBeats += beatsToMultiplyBy;
+				passedTime += crotchet * beatsToMultiplyBy;
+
+				//Increamenting the beats counter
+				bpmsCounter++;
+
+				//Recalculating the crotchet
+				currentBPM = bpms[bpmsCounter].y;
+				crotchet = 60f / currentBPM;
+			}
+
+			//Adding the current note to the float list array
+			if (note_Types [num] == 0)
+			{
+				float time = passedTime + crotchet * ((float)note_BeatTimes [num] - passedBeats);
+				notes [(int)note_Lanes [num]].Add (time);
+				//Debug.Log (crotchet + "\t" + time);
+			}
+		}
+
+		return notes;
+	}
+
+	//================
+	// MODULE METHODS
+	//================
 
 	//ReadChartFile()
 	public bool ReadChartFile(string chartLocation)
 	{
 		AbortCheck(false);
 
-		//Reading the chart
-		if (module.Call(mod_DumpChartFile).Boolean)
-		{
-			chartLoaded = module.Call(mod_ReadChartFile, DynValue.NewString(chartLocation)).Boolean;
-		}
+		chartLoaded = module.Call(mod_ReadChartFile, DynValue.NewString(chartLocation)).Boolean;
 
 		return chartLoaded;
+	}
+
+	public bool DumpChartFile()
+	{
+		AbortCheck (false);
+
+		chartLoaded = !module.Call (mod_DumpChartFile).Boolean;
+
+		return !chartLoaded;
 	}
 
 	//GetChartMetaInfo()
@@ -284,6 +377,48 @@ public class ModuleManager : MonoBehaviour
 		return metaInfo;
 	}
 
+	//GetAudioFile()
+	public string GetAudioFile()
+	{
+		AbortCheck (true);
+
+		string audioFile = module.Call (mod_GetAudioFile).String;
+		
+		return audioFile;
+	}
+
+	//GetBackground() -- Returns a string to the image/video file to put in the background
+	public string GetBackground()
+	{
+		AbortCheck (true);
+
+		string bg = module.Call(mod_GetBackground).String;
+
+		return bg;
+	}
+
+	//GetBPMs() -- Returns a Vector2 array of the beats per minute (BPM) profiles of the selected chart file
+	public Vector2[] GetBPMs()
+	{
+		AbortCheck (true);
+
+		Vector2[] bpms;
+
+		Table chartBPMs = module.Call (mod_GetBPMs).Table;
+
+		List<DynValue> bpmTimes = new List<DynValue>(chartBPMs.Keys);
+		List<DynValue> bpmValues = new List<DynValue>(chartBPMs.Values);
+
+		bpms = new Vector2[bpmTimes.Count];
+
+		for (int num = 0; num < bpmTimes.Count; num++)
+		{
+			bpms [num] = new Vector2 ((float) bpmTimes [num].Number, (float) bpmValues [num].Number);
+		}
+
+		return bpms;
+	}
+
 	//GetChartDifficulties
 	public string[] GetChartDifficulties()
 	{
@@ -299,6 +434,16 @@ public class ModuleManager : MonoBehaviour
 		return chartDifficulties;
 	}
 
+	public double GetChartOffset()
+	{
+		AbortCheck (true);
+		
+		double offset = module.Call(mod_GetChartOffset).Number;
+		
+		return offset;
+	}
+
+	//ReadChartData()
 	public bool ReadChartData(string difficulty)
 	{
 		AbortCheck (false);
@@ -313,32 +458,39 @@ public class ModuleManager : MonoBehaviour
 		return result;
 	}
 
-	//GetChartCount()
-	public ulong GetChartCount()
+	public double[] GetBeatTimes()
 	{
-		AbortCheck (false);
+		AbortCheck (true);
+
+		List<DynValue> dynBeatTimes = new List<DynValue>(module.Call(mod_NoteBeatTimes).Table.Values);
+		double[] beatTimes = new double[dynBeatTimes.Count];
+		for (int num = 0; num < dynBeatTimes.Count; num++)
+			beatTimes [num] = dynBeatTimes [num].Number;
 		
-		ulong result = 0;
-
-		try
-		{
-			string[] chartFiles = Directory.GetFiles(chartsLocation + ModuleFolder, "*" + ModuleExtension);
-		}
-		catch (Exception e)
-		{
-			throw e;
-		}
-
-		return result;
+		return beatTimes;
 	}
 
-    //EarlyAbort()
-    private void AbortCheck(bool checkChartRead)
-    {
-        if (!ModuleLoaded)
-            throw new Exception("MODULE NOT LOADED");
+	public double[] GetNoteTypes()
+	{
+		AbortCheck (true);
 
-        if (checkChartRead && !chartLoaded)
-            throw new Exception("CHART NOT LOADED");
-    }
+		List<DynValue> dynNoteTypes = new List<DynValue>(module.Call(mod_NoteTypes).Table.Values);
+		double[] noteTypes = new double[dynNoteTypes.Count];
+		for (int num = 0; num < dynNoteTypes.Count; num++)
+			noteTypes [num] = dynNoteTypes [num].Number;
+
+		return noteTypes;
+	}
+
+	public double[] GetNoteLanes()
+	{
+		AbortCheck (true);
+
+		List<DynValue> dynNoteLanes = new List<DynValue>(module.Call(mod_NoteLanes).Table.Values);
+		double[] noteLanes = new double[dynNoteLanes.Count];
+		for (int num = 0; num < dynNoteLanes.Count; num++)
+			noteLanes [num] = dynNoteLanes [num].Number;
+
+		return noteLanes;
+	}
 }

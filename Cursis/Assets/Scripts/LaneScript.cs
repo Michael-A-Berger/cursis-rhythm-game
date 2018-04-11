@@ -78,12 +78,12 @@ public class LaneScript : MonoBehaviour
     }
 
     //ChangeHitText()
-    public void ChangeHitText(bool noteHit)
+	public void ChangeHitText(bool noteHit, float msOffset)
     {
         if (noteHit)
         {
             display.color = Color.green;
-            display.text = displayPrefix + "Hit!";
+			display.text = displayPrefix + "Hit! (" + msOffset + ")";
         }
         else
         {

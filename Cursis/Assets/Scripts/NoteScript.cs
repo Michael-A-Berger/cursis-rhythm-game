@@ -4,8 +4,11 @@ using UnityEngine;
 
 public class NoteScript : MonoBehaviour
 {
+	//Attributes
     private float lerpFct = 0f;
     private float songPos;
+
+	//Attribute Accessors
     public float songPosition
     {
         private set
@@ -32,18 +35,4 @@ public class NoteScript : MonoBehaviour
     {
         songPosition = pos;
     }
-
-    /*
-    //Move()
-    public void Move(float audioTime)
-    {
-        Vector3 newPos;
-        lerpFct = (secondsInAdvance - (songPosition - audioTime)) / secondsInAdvance;
-        if (lerpFactor <= 1f)
-            newPos = Vector3.Lerp(startPos, lanePos, lerpFct);
-        else
-            newPos = Vector3.Lerp(lanePos, endPos, (lerpFct - 1f) / 0.15f);
-        this.transform.position = newPos;
-    }
-    */
 }
